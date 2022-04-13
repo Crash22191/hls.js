@@ -268,6 +268,12 @@ class TSDemuxer implements Demuxer {
           offset = start + 4;
         }
         switch (pid) {
+          //KLV
+          case 258:
+            let s = String.fromCharCode(...data.subarray(offset , start + 188));
+            this.observer.emit(Events.KLV_RECEIVED,Events.KLV_RECEIVED,s );
+            break;
+
           case avcId:
             if (stt) {
               if (avcData && (pes = parsePES(avcData))) {

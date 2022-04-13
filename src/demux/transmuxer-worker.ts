@@ -14,6 +14,7 @@ export default function TransmuxerWorker(self) {
   // forward events to main thread
   observer.on(Events.FRAG_DECRYPTED, forwardMessage);
   observer.on(Events.ERROR, forwardMessage);
+  observer.on(Events.KLV_RECEIVED, forwardMessage);
 
   self.addEventListener('message', (ev) => {
     const data = ev.data;

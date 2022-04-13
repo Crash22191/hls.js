@@ -542,6 +542,8 @@ export enum Events {
     // (undocumented)
     KEY_LOADING = "hlsKeyLoading",
     // (undocumented)
+    KLV_RECEIVED = "hlsKLVpacketReceived",
+    // (undocumented)
     LEVEL_LOADED = "hlsLevelLoaded",
     // (undocumented)
     LEVEL_LOADING = "hlsLevelLoading",
@@ -1070,6 +1072,8 @@ export interface HlsListeners {
     [Events.KEY_LOADED]: (event: Events.KEY_LOADED, data: KeyLoadedData) => void;
     // (undocumented)
     [Events.KEY_LOADING]: (event: Events.KEY_LOADING, data: KeyLoadingData) => void;
+    // (undocumented)
+    [Events.KLV_RECEIVED]: (event: Events.KLV_RECEIVED, data: string) => void;
     // (undocumented)
     [Events.LEVEL_LOADED]: (event: Events.LEVEL_LOADED, data: LevelLoadedData) => void;
     // (undocumented)

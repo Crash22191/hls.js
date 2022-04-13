@@ -287,6 +287,11 @@ export default class TransmuxerInterface {
         break;
       }
 
+      case Events.KLV_RECEIVED:{
+        hls.trigger(data.event, data);
+        break;
+      }
+
       /* falls through */
       default: {
         data.data = data.data || {};
