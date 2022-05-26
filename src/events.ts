@@ -363,7 +363,7 @@ export interface HlsListeners {
     event: Events.BACK_BUFFER_REACHED,
     data: BackBufferData
   ) => void;
-  [Events.KLV_RECEIVED]: (event: Events.KLV_RECEIVED, data: string) => void;
+  [Events.KLV_RECEIVED]: (event: Events.KLV_RECEIVED, data: any) => void;
 }
 export interface HlsEventEmitter {
   on<E extends keyof HlsListeners, Context = undefined>(

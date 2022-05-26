@@ -1073,7 +1073,7 @@ export interface HlsListeners {
     // (undocumented)
     [Events.KEY_LOADING]: (event: Events.KEY_LOADING, data: KeyLoadingData) => void;
     // (undocumented)
-    [Events.KLV_RECEIVED]: (event: Events.KLV_RECEIVED, data: string) => void;
+    [Events.KLV_RECEIVED]: (event: Events.KLV_RECEIVED, data: any) => void;
     // (undocumented)
     [Events.LEVEL_LOADED]: (event: Events.LEVEL_LOADED, data: LevelLoadedData) => void;
     // (undocumented)

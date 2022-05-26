@@ -218,7 +218,7 @@ class TSDemuxer implements Demuxer {
     let unknownPIDs = false;
     let pmtParsed = this.pmtParsed;
     let pmtId = this._pmtId;
-
+    let privateDataPids :number[] = []
     let len = data.length;
     if (this.remainderData) {
       data = appendUint8Array(this.remainderData, data);
@@ -267,111 +267,117 @@ class TSDemuxer implements Demuxer {
         } else {
           offset = start + 4;
         }
-        switch (pid) {
-          //KLV
-          case 258:
-            let s = String.fromCharCode(...data.subarray(offset , start + 188));
-            this.observer.emit(Events.KLV_RECEIVED,Events.KLV_RECEIVED,s );
-            break;
 
-          case avcId:
-            if (stt) {
-              if (avcData && (pes = parsePES(avcData))) {
-                this.parseAVCPES(videoTrack, textTrack, pes, false);
-              }
-
-              avcData = { data: [], size: 0 };
-            }
-            if (avcData) {
-              avcData.data.push(data.subarray(offset, start + 188));
-              avcData.size += start + 188 - offset;
-            }
-            break;
-          case audioId:
-            if (stt) {
-              if (audioData && (pes = parsePES(audioData))) {
-                if (audioTrack.isAAC) {
-                  this.parseAACPES(audioTrack, pes);
-                } else {
-                  this.parseMPEGPES(audioTrack, pes);
+        if(privateDataPids.length > 0 && privateDataPids.indexOf(pid) > -1)
+        {
+          //Private data probably KLV  
+          let temp = {pid: pid, data:data.subarray(offset, start + 188)}
+          this.observer.emit(Events.KLV_RECEIVED,Events.KLV_RECEIVED,temp);
+        }
+        else 
+        {
+          switch (pid) {
+            case avcId:
+              if (stt) {
+                if (avcData && (pes = parsePES(avcData))) {
+                  this.parseAVCPES(videoTrack, textTrack, pes, false);
                 }
+  
+                avcData = { data: [], size: 0 };
               }
-              audioData = { data: [], size: 0 };
-            }
-            if (audioData) {
-              audioData.data.push(data.subarray(offset, start + 188));
-              audioData.size += start + 188 - offset;
-            }
-            break;
-          case id3Id:
-            if (stt) {
-              if (id3Data && (pes = parsePES(id3Data))) {
-                this.parseID3PES(id3Track, pes);
+              if (avcData) {
+                avcData.data.push(data.subarray(offset, start + 188));
+                avcData.size += start + 188 - offset;
               }
-
-              id3Data = { data: [], size: 0 };
+              break;
+            case audioId:
+              if (stt) {
+                if (audioData && (pes = parsePES(audioData))) {
+                  if (audioTrack.isAAC) {
+                    this.parseAACPES(audioTrack, pes);
+                  } else {
+                    this.parseMPEGPES(audioTrack, pes);
+                  }
+                }
+                audioData = { data: [], size: 0 };
+              }
+              if (audioData) {
+                audioData.data.push(data.subarray(offset, start + 188));
+                audioData.size += start + 188 - offset;
+              }
+              break;
+            case id3Id:
+              if (stt) {
+                if (id3Data && (pes = parsePES(id3Data))) {
+                  this.parseID3PES(id3Track, pes);
+                }
+  
+                id3Data = { data: [], size: 0 };
+              }
+              if (id3Data) {
+                id3Data.data.push(data.subarray(offset, start + 188));
+                id3Data.size += start + 188 - offset;
+              }
+              break;
+            case 0:
+              if (stt) {
+                offset += data[offset] + 1;
+              }
+  
+              pmtId = this._pmtId = parsePAT(data, offset);
+              break;
+            case pmtId: {
+              if (stt) {
+                offset += data[offset] + 1;
+              }
+  
+              const parsedPIDs = parsePMT(
+                data,
+                offset,
+                this.typeSupported.mpeg === true ||
+                  this.typeSupported.mp3 === true,
+                isSampleAes
+              );
+                // console.log("Parsed PMT " + JSON.stringify(parsedPIDs));
+              // only update track id if track PID found while parsing PMT
+              // this is to avoid resetting the PID to -1 in case
+              // track PID transiently disappears from the stream
+              // this could happen in case of transient missing audio samples for example
+              // NOTE this is only the PID of the track as found in TS,
+              // but we are not using this for MP4 track IDs.
+              avcId = parsedPIDs.avc;
+              if (avcId > 0) {
+                videoTrack.pid = avcId;
+              }
+  
+              audioId = parsedPIDs.audio;
+              if (audioId > 0) {
+                audioTrack.pid = audioId;
+                audioTrack.isAAC = parsedPIDs.isAAC;
+              }
+              id3Id = parsedPIDs.id3;
+              if (id3Id > 0) {
+                id3Track.pid = id3Id;
+              }
+  
+              privateDataPids = parsedPIDs.private_data
+  
+              if (unknownPIDs && !pmtParsed) {
+                logger.log('reparse from beginning');
+                unknownPIDs = false;
+                // we set it to -188, the += 188 in the for loop will reset start to 0
+                start = syncOffset - 188;
+              }
+              pmtParsed = this.pmtParsed = true;
+              break;
             }
-            if (id3Data) {
-              id3Data.data.push(data.subarray(offset, start + 188));
-              id3Data.size += start + 188 - offset;
-            }
-            break;
-          case 0:
-            if (stt) {
-              offset += data[offset] + 1;
-            }
-
-            pmtId = this._pmtId = parsePAT(data, offset);
-            break;
-          case pmtId: {
-            if (stt) {
-              offset += data[offset] + 1;
-            }
-
-            const parsedPIDs = parsePMT(
-              data,
-              offset,
-              this.typeSupported.mpeg === true ||
-                this.typeSupported.mp3 === true,
-              isSampleAes
-            );
-
-            // only update track id if track PID found while parsing PMT
-            // this is to avoid resetting the PID to -1 in case
-            // track PID transiently disappears from the stream
-            // this could happen in case of transient missing audio samples for example
-            // NOTE this is only the PID of the track as found in TS,
-            // but we are not using this for MP4 track IDs.
-            avcId = parsedPIDs.avc;
-            if (avcId > 0) {
-              videoTrack.pid = avcId;
-            }
-
-            audioId = parsedPIDs.audio;
-            if (audioId > 0) {
-              audioTrack.pid = audioId;
-              audioTrack.isAAC = parsedPIDs.isAAC;
-            }
-            id3Id = parsedPIDs.id3;
-            if (id3Id > 0) {
-              id3Track.pid = id3Id;
-            }
-
-            if (unknownPIDs && !pmtParsed) {
-              logger.log('reparse from beginning');
-              unknownPIDs = false;
-              // we set it to -188, the += 188 in the for loop will reset start to 0
-              start = syncOffset - 188;
-            }
-            pmtParsed = this.pmtParsed = true;
-            break;
+            case 17:
+            case 0x1fff:
+              break;
+            default:
+              unknownPIDs = true;
+              break;
           }
-          case 17:
-          case 0x1fff:
-            break;
-          default:
-            unknownPIDs = true;
-            break;
         }
       } else {
         tsPacketErrors++;
@@ -999,7 +1005,7 @@ function parsePAT(data, offset) {
 }
 
 function parsePMT(data, offset, mpegSupported, isSampleAes) {
-  const result = { audio: -1, avc: -1, id3: -1, isAAC: true };
+  const result = { audio: -1, avc: -1, id3: -1, isAAC: true, private_data :[] };
   const sectionLength = ((data[offset + 1] & 0x0f) << 8) | data[offset + 2];
   const tableEnd = offset + 3 + sectionLength - 4;
   // to determine where the table is, we have to figure out how
@@ -1011,6 +1017,16 @@ function parsePMT(data, offset, mpegSupported, isSampleAes) {
   while (offset < tableEnd) {
     const pid = ((data[offset + 1] & 0x1f) << 8) | data[offset + 2];
     switch (data[offset]) {
+      case 0xfc:
+      case 0xbd:
+      case 0x06:
+        //@ts-ignore
+        if(result.private_data.indexOf(pid) === -1)
+        {
+                  //@ts-ignore
+          result.private_data.push(pid)
+        }
+        break;
       case 0xcf: // SAMPLE-AES AAC
         if (!isSampleAes) {
           logger.log(

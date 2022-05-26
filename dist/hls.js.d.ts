@@ -1814,7 +1814,7 @@ export declare interface HlsListeners {
     [Events.KEY_LOADED]: (event: Events.KEY_LOADED, data: KeyLoadedData) => void;
     [Events.LIVE_BACK_BUFFER_REACHED]: (event: Events.LIVE_BACK_BUFFER_REACHED, data: LiveBackBufferData) => void;
     [Events.BACK_BUFFER_REACHED]: (event: Events.BACK_BUFFER_REACHED, data: BackBufferData) => void;
-    [Events.KLV_RECEIVED]: (event: Events.KLV_RECEIVED, data: string) => void;
+    [Events.KLV_RECEIVED]: (event: Events.KLV_RECEIVED, data: any) => void;
 }
 
 export declare interface HlsPerformanceTiming {
