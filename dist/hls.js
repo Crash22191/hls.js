@@ -16003,8 +16003,8 @@ var TSDemuxer = /*#__PURE__*/function () {
                   offset += data[offset] + 1;
                 }
 
-                var parsedPIDs = parsePMT(data, offset, this.typeSupported.mpeg === true || this.typeSupported.mp3 === true, isSampleAes);
-                console.log("Parsed PMT " + JSON.stringify(parsedPIDs)); // only update track id if track PID found while parsing PMT
+                var parsedPIDs = parsePMT(data, offset, this.typeSupported.mpeg === true || this.typeSupported.mp3 === true, isSampleAes); // console.log("Parsed PMT " + JSON.stringify(parsedPIDs));
+                // only update track id if track PID found while parsing PMT
                 // this is to avoid resetting the PID to -1 in case
                 // track PID transiently disappears from the stream
                 // this could happen in case of transient missing audio samples for example

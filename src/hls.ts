@@ -31,6 +31,7 @@ import type { Fragment } from './loader/fragment';
  * @class
  * @constructor
  */
+
 export default class Hls implements HlsEventEmitter {
   private static defaultConfig?: HlsConfig;
 
