@@ -1035,7 +1035,8 @@ var hlsDefaultConfig = _objectSpread(_objectSpread({
   testBandwidth: true,
   progressive: false,
   lowLatencyMode: true,
-  cmcd: undefined
+  cmcd: undefined,
+  checkPayload: undefined
 }, timelineConfig()), {}, {
   subtitleStreamController:  true ? _controller_subtitle_stream_controller__WEBPACK_IMPORTED_MODULE_3__["SubtitleStreamController"] : undefined,
   subtitleTrackController:  true ? _controller_subtitle_track_controller__WEBPACK_IMPORTED_MODULE_4__["default"] : undefined,
@@ -15928,10 +15929,11 @@ var TSDemuxer = /*#__PURE__*/function () {
           this.observer.emit(_events__WEBPACK_IMPORTED_MODULE_4__["Events"].KLV_RECEIVED, _events__WEBPACK_IMPORTED_MODULE_4__["Events"].KLV_RECEIVED, temp);
         } else {
           switch (pid) {
+            //video 
             case avcId:
               if (stt) {
                 if (avcData && (pes = parsePES(avcData))) {
-                  this.parseAVCPES(videoTrack, textTrack, pes, false);
+                  this.parseAVCPES(videoTrack, textTrack, pes, false, data.subarray(offset, start + 188));
                 }
 
                 avcData = {
@@ -16120,7 +16122,7 @@ var TSDemuxer = /*#__PURE__*/function () {
     var pes;
 
     if (avcData && (pes = parsePES(avcData))) {
-      this.parseAVCPES(videoTrack, textTrack, pes, true);
+      this.parseAVCPES(videoTrack, textTrack, pes, true, null);
       videoTrack.pesData = null;
     } else {
       // either avcData null or PES truncated, keep it for next frag parsing
@@ -16186,7 +16188,7 @@ var TSDemuxer = /*#__PURE__*/function () {
     this._duration = 0;
   };
 
-  _proto.parseAVCPES = function parseAVCPES(track, textTrack, pes, last) {
+  _proto.parseAVCPES = function parseAVCPES(track, textTrack, pes, last, data) {
     var _this = this;
 
     var units = this.parseAVCNALu(track, pes.data);
@@ -16219,17 +16221,18 @@ var TSDemuxer = /*#__PURE__*/function () {
             }
 
             avcSample.frame = true;
-            var data = unit.data; // only check slice type to detect KF in case SPS found in same packet (any keyframe is preceded by SPS ...)
+            var _data = unit.data; // only check slice type to detect KF in case SPS found in same packet (any keyframe is preceded by SPS ...)
 
-            if (spsfound && data.length > 4) {
+            if (spsfound && _data.length > 4) {
               // retrieve slice type by parsing beginning of NAL unit (follow H264 spec, slice_header definition) to detect keyframe embedded in NDR
-              var sliceType = new _exp_golomb__WEBPACK_IMPORTED_MODULE_2__["default"](data).readSliceType(); // 2 : I slice, 4 : SI slice, 7 : I slice, 9: SI slice
+              var sliceType = new _exp_golomb__WEBPACK_IMPORTED_MODULE_2__["default"](_data).readSliceType(); // 2 : I slice, 4 : SI slice, 7 : I slice, 9: SI slice
               // SI slice : A slice that is coded using intra prediction only and using quantisation of the prediction samples.
               // An SI slice can be coded such that its decoded samples can be constructed identically to an SP slice.
               // I slice: A slice that is not an SI slice that is decoded using intra prediction only.
               // if (sliceType === 2 || sliceType === 7) {
 
               if (sliceType === 2 || sliceType === 4 || sliceType === 7 || sliceType === 9) {
+                //identifies keyframe 
                 avcSample.key = true;
               }
             }
@@ -16347,7 +16350,12 @@ var TSDemuxer = /*#__PURE__*/function () {
 
         _units.push(unit);
       }
-    }); // if last PES packet, push samples
+    });
+
+    if (data !== null && avcSample && avcSample.pts && this.config.checkPayload !== undefined) {
+      this.config.checkPayload(pes.pts, data, pes);
+    } // if last PES packet, push samples
+
 
     if (last && avcSample) {
       pushAccessUnit(avcSample, track);

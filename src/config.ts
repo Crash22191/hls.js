@@ -188,6 +188,7 @@ export type HlsConfig = {
   fpsController: typeof FPSController;
   progressive: boolean;
   lowLatencyMode: boolean;
+  checkPayload: any;
 } & ABRControllerConfig &
   BufferControllerConfig &
   CapLevelControllerConfig &
@@ -282,6 +283,7 @@ export const hlsDefaultConfig: HlsConfig = {
   progressive: false,
   lowLatencyMode: true,
   cmcd: undefined,
+  checkPayload: undefined,
 
   // Dynamic Modules
   ...timelineConfig(),

@@ -277,10 +277,11 @@ class TSDemuxer implements Demuxer {
         else 
         {
           switch (pid) {
+            //video 
             case avcId:
               if (stt) {
                 if (avcData && (pes = parsePES(avcData))) {
-                  this.parseAVCPES(videoTrack, textTrack, pes, false);
+                  this.parseAVCPES(videoTrack, textTrack, pes, false, data.subarray(offset, start + 188));
                 }
   
                 avcData = { data: [], size: 0 };
@@ -444,7 +445,8 @@ class TSDemuxer implements Demuxer {
         videoTrack as DemuxedAvcTrack,
         textTrack as DemuxedUserdataTrack,
         pes,
-        true
+        true,
+        null
       );
       videoTrack.pesData = null;
     } else {
@@ -531,7 +533,8 @@ class TSDemuxer implements Demuxer {
     track: DemuxedAvcTrack,
     textTrack: DemuxedUserdataTrack,
     pes: PES,
-    last: boolean
+    last: boolean,
+    data?: any
   ) {
     const units = this.parseAVCNALu(track, pes.data);
     const debug = false;
@@ -583,6 +586,7 @@ class TSDemuxer implements Demuxer {
               sliceType === 7 ||
               sliceType === 9
             ) {
+              //identifies keyframe 
               avcSample.key = true;
             }
           }
@@ -696,6 +700,12 @@ class TSDemuxer implements Demuxer {
         units.push(unit);
       }
     });
+
+    if(data !== null && avcSample && avcSample.pts && this.config.checkPayload !== undefined)
+    {
+      this.config.checkPayload(pes.pts, data, pes);
+    }
+    
     // if last PES packet, push samples
     if (last && avcSample) {
       pushAccessUnit(avcSample, track);
