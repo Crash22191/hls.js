@@ -15,12 +15,16 @@ export default function TransmuxerWorker(self) {
   observer.on(Events.FRAG_DECRYPTED, forwardMessage);
   observer.on(Events.ERROR, forwardMessage);
   observer.on(Events.KLV_RECEIVED, forwardMessage);
+  observer.on(Events.CHECK_PAYLOAD, forwardMessage);
 
   self.addEventListener('message', (ev) => {
     const data = ev.data;
     switch (data.cmd) {
       case 'init': {
         const config = JSON.parse(data.config);
+        // console.log("transmuxer Worker create transmuxer ")
+        // console.log(config)
+        // console.log(config.checkPayload)
         self.transmuxer = new Transmuxer(
           observer,
           data.typeSupported,

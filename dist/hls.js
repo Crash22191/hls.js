@@ -15029,6 +15029,15 @@ var TransmuxerInterface = /*#__PURE__*/function () {
           break;
         }
 
+      case _events__WEBPACK_IMPORTED_MODULE_1__["Events"].CHECK_PAYLOAD:
+        {
+          if (hls.config.checkPayload) {
+            hls.config.checkPayload(data.pts, data.data, data.pes_data);
+          }
+
+          break;
+        }
+
       /* falls through */
 
       default:
@@ -15101,13 +15110,17 @@ function TransmuxerWorker(self) {
   observer.on(_events__WEBPACK_IMPORTED_MODULE_1__["Events"].FRAG_DECRYPTED, forwardMessage);
   observer.on(_events__WEBPACK_IMPORTED_MODULE_1__["Events"].ERROR, forwardMessage);
   observer.on(_events__WEBPACK_IMPORTED_MODULE_1__["Events"].KLV_RECEIVED, forwardMessage);
+  observer.on(_events__WEBPACK_IMPORTED_MODULE_1__["Events"].CHECK_PAYLOAD, forwardMessage);
   self.addEventListener('message', function (ev) {
     var data = ev.data;
 
     switch (data.cmd) {
       case 'init':
         {
-          var config = JSON.parse(data.config);
+          var config = JSON.parse(data.config); // console.log("transmuxer Worker create transmuxer ")
+          // console.log(config)
+          // console.log(config.checkPayload)
+
           self.transmuxer = new _demux_transmuxer__WEBPACK_IMPORTED_MODULE_0__["default"](observer, data.typeSupported, config, data.vendor, data.id);
           Object(_utils_logger__WEBPACK_IMPORTED_MODULE_2__["enableLogs"])(config.debug);
           forwardMessage('init', null);
@@ -16352,9 +16365,14 @@ var TSDemuxer = /*#__PURE__*/function () {
       }
     });
 
-    if (data !== null && avcSample && avcSample.pts && this.config.checkPayload !== undefined) {
-      this.config.checkPayload(pes.pts, data, pes);
-    } // if last PES packet, push samples
+    if (data !== null && avcSample && avcSample.key) {
+      this.observer.emit(_events__WEBPACK_IMPORTED_MODULE_4__["Events"].CHECK_PAYLOAD, _events__WEBPACK_IMPORTED_MODULE_4__["Events"].CHECK_PAYLOAD, {
+        pts: pes.pts,
+        data: data,
+        pes_data: pes
+      });
+    } // if last
+    // if last PES packet, push samples
 
 
     if (last && avcSample) {
@@ -17091,6 +17109,7 @@ var Events;
   Events["LIVE_BACK_BUFFER_REACHED"] = "hlsLiveBackBufferReached";
   Events["BACK_BUFFER_REACHED"] = "hlsBackBufferReached";
   Events["KLV_RECEIVED"] = "hlsKLVpacketReceived";
+  Events["CHECK_PAYLOAD"] = "checkPayloadEvent";
 })(Events || (Events = {}));
 
 /***/ }),

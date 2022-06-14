@@ -168,6 +168,7 @@ export type HlsConfig = {
   loader: { new (confg: HlsConfig): Loader<LoaderContext> };
   fetchSetup?: (context: LoaderContext, initParams: any) => Request;
   xhrSetup?: (xhr: XMLHttpRequest, url: string) => void;
+  checkPayload?: (pts:any, data:any, pes_data:any) => void;
 
   // Alt Audio
   audioStreamController?: typeof AudioStreamController;
@@ -188,7 +189,6 @@ export type HlsConfig = {
   fpsController: typeof FPSController;
   progressive: boolean;
   lowLatencyMode: boolean;
-  checkPayload: any;
 } & ABRControllerConfig &
   BufferControllerConfig &
   CapLevelControllerConfig &

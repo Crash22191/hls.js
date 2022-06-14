@@ -1142,7 +1142,8 @@ export declare enum Events {
     KEY_LOADED = "hlsKeyLoaded",
     LIVE_BACK_BUFFER_REACHED = "hlsLiveBackBufferReached",
     BACK_BUFFER_REACHED = "hlsBackBufferReached",
-    KLV_RECEIVED = "hlsKLVpacketReceived"
+    KLV_RECEIVED = "hlsKLVpacketReceived",
+    CHECK_PAYLOAD = "checkPayloadEvent"
 }
 
 declare class EwmaBandWidthEstimator {
@@ -1733,6 +1734,7 @@ export declare type HlsConfig = {
     };
     fetchSetup?: (context: LoaderContext, initParams: any) => Request;
     xhrSetup?: (xhr: XMLHttpRequest, url: string) => void;
+    checkPayload?: (pts: any, data: any, pes_data: any) => void;
     audioStreamController?: typeof AudioStreamController;
     audioTrackController?: typeof AudioTrackController;
     subtitleStreamController?: typeof SubtitleStreamController;
@@ -1747,7 +1749,6 @@ export declare type HlsConfig = {
     fpsController: typeof FPSController;
     progressive: boolean;
     lowLatencyMode: boolean;
-    checkPayload: any;
 } & ABRControllerConfig & BufferControllerConfig & CapLevelControllerConfig & EMEControllerConfig & FPSControllerConfig & FragmentLoaderConfig & LevelControllerConfig & MP4RemuxerConfig & PlaylistLoaderConfig & StreamControllerConfig & LatencyControllerConfig & TimelineControllerConfig & TSDemuxerConfig;
 
 export declare interface HlsEventEmitter {
@@ -1816,6 +1817,7 @@ export declare interface HlsListeners {
     [Events.LIVE_BACK_BUFFER_REACHED]: (event: Events.LIVE_BACK_BUFFER_REACHED, data: LiveBackBufferData) => void;
     [Events.BACK_BUFFER_REACHED]: (event: Events.BACK_BUFFER_REACHED, data: BackBufferData) => void;
     [Events.KLV_RECEIVED]: (event: Events.KLV_RECEIVED, data: any) => void;
+    [Events.CHECK_PAYLOAD]: (event: Events.CHECK_PAYLOAD, data: any) => void;
 }
 
 export declare interface HlsPerformanceTiming {

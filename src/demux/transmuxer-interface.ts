@@ -42,7 +42,6 @@ export default class TransmuxerInterface {
     this.onFlush = onFlush;
 
     const config = hls.config;
-
     const forwardMessage = (ev, data) => {
       data = data || {};
       data.frag = this.frag;
@@ -289,6 +288,14 @@ export default class TransmuxerInterface {
 
       case Events.KLV_RECEIVED:{
         hls.trigger(data.event, data);
+        break;
+      }
+
+      case Events.CHECK_PAYLOAD:{
+        if(hls.config.checkPayload)
+        {
+          hls.config.checkPayload(data.pts, data.data, data.pes_data);
+        }
         break;
       }
 

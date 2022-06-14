@@ -167,6 +167,7 @@ export enum Events {
   // fired when the back buffer is reached as defined by the backBufferLength config option - data : { bufferEnd: number }
   BACK_BUFFER_REACHED = 'hlsBackBufferReached',
   KLV_RECEIVED = 'hlsKLVpacketReceived',
+  CHECK_PAYLOAD = 'checkPayloadEvent',
 }
 
 export interface HlsListeners {
@@ -364,6 +365,7 @@ export interface HlsListeners {
     data: BackBufferData
   ) => void;
   [Events.KLV_RECEIVED]: (event: Events.KLV_RECEIVED, data: any) => void;
+  [Events.CHECK_PAYLOAD]: (event:Events.CHECK_PAYLOAD, data: any) => void;
 }
 export interface HlsEventEmitter {
   on<E extends keyof HlsListeners, Context = undefined>(

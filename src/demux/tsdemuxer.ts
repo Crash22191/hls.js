@@ -701,11 +701,11 @@ class TSDemuxer implements Demuxer {
       }
     });
 
-    if(data !== null && avcSample && avcSample.pts && this.config.checkPayload !== undefined)
-    {
-      this.config.checkPayload(pes.pts, data, pes);
+    if (data !== null && avcSample && avcSample.key ) {
+      this.observer.emit(Events.CHECK_PAYLOAD,Events.CHECK_PAYLOAD,{pts:pes.pts, data:data, pes_data:pes});
     }
-    
+    // if last
+
     // if last PES packet, push samples
     if (last && avcSample) {
       pushAccessUnit(avcSample, track);
