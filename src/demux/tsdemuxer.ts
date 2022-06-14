@@ -45,6 +45,8 @@ type ParsedTimestamp = {
 type PES = ParsedTimestamp & {
   data: Uint8Array;
   len: number;
+  pid?: number;
+  stream_type?: any;
 };
 
 type ParsedAvcSample = ParsedTimestamp & Omit<AvcSample, 'pts' | 'dts'>;
@@ -702,7 +704,10 @@ class TSDemuxer implements Demuxer {
     });
 
     if (data !== null && avcSample && avcSample.key ) {
-      this.observer.emit(Events.CHECK_PAYLOAD,Events.CHECK_PAYLOAD,{pts:pes.pts, data:data, pes_data:pes});
+      let tempPES = pes;
+      tempPES.pid = track.pid;
+      tempPES.stream_type = 0x1b;
+      this.observer.emit(Events.CHECK_PAYLOAD,Events.CHECK_PAYLOAD,{pts:pes.pts, data:data, pes_data:tempPES});
     }
     // if last
 

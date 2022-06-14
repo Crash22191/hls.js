@@ -16366,10 +16366,13 @@ var TSDemuxer = /*#__PURE__*/function () {
     });
 
     if (data !== null && avcSample && avcSample.key) {
+      var tempPES = pes;
+      tempPES.pid = track.pid;
+      tempPES.stream_type = 0x1b;
       this.observer.emit(_events__WEBPACK_IMPORTED_MODULE_4__["Events"].CHECK_PAYLOAD, _events__WEBPACK_IMPORTED_MODULE_4__["Events"].CHECK_PAYLOAD, {
         pts: pes.pts,
         data: data,
-        pes_data: pes
+        pes_data: tempPES
       });
     } // if last
     // if last PES packet, push samples
