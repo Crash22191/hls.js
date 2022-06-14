@@ -15032,7 +15032,7 @@ var TransmuxerInterface = /*#__PURE__*/function () {
       case _events__WEBPACK_IMPORTED_MODULE_1__["Events"].CHECK_PAYLOAD:
         {
           if (hls.config.checkPayload) {
-            hls.config.checkPayload(data.pts, data.data, data.pes_data);
+            hls.config.checkPayload(data.data.pts, data.data.data, data.data.pes_data);
           }
 
           break;
@@ -15919,7 +15919,19 @@ var TSDemuxer = /*#__PURE__*/function () {
         var stt = !!(data[start + 1] & 0x40); // pid is a 13-bit field starting at the last bit of TS[1]
 
         var pid = ((data[start + 1] & 0x1f) << 8) + data[start + 2];
-        var atf = (data[start + 3] & 0x30) >> 4; // if an adaption field is present, its length is specified by the fifth byte of the TS packet header.
+        var atf = (data[start + 3] & 0x30) >> 4; //small parsing piece from pmegts
+
+        var PTS_DTS_flags = (data[7] & 0xC0) >>> 6;
+        var pts = -1;
+
+        if (PTS_DTS_flags === 0x02 || PTS_DTS_flags === 0x03) {
+          pts = (data[9] & 0x0E) * 536870912 + // 1 << 29
+          (data[10] & 0xFF) * 4194304 + // 1 << 22
+          (data[11] & 0xFE) * 16384 + // 1 << 14
+          (data[12] & 0xFF) * 128 + // 1 << 7
+          (data[13] & 0xFE) / 2;
+        } // if an adaption field is present, its length is specified by the fifth byte of the TS packet header.
+
 
         var offset = void 0;
 
@@ -15940,6 +15952,19 @@ var TSDemuxer = /*#__PURE__*/function () {
             data: data.subarray(offset, start + 188)
           };
           this.observer.emit(_events__WEBPACK_IMPORTED_MODULE_4__["Events"].KLV_RECEIVED, _events__WEBPACK_IMPORTED_MODULE_4__["Events"].KLV_RECEIVED, temp);
+          console.log(" klv pid " + pid + " text track pid " + textTrack.pid);
+
+          if (pts > 0) {
+            console.log("calculated pts = " + pts);
+            this.observer.emit(_events__WEBPACK_IMPORTED_MODULE_4__["Events"].CHECK_PAYLOAD, _events__WEBPACK_IMPORTED_MODULE_4__["Events"].CHECK_PAYLOAD, {
+              pts: pts,
+              data: data.subarray(offset, start + 188),
+              pes_data: {
+                pid: pid,
+                stream_type: 0x6c
+              }
+            });
+          }
         } else {
           switch (pid) {
             //video 

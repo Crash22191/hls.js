@@ -257,7 +257,17 @@ class TSDemuxer implements Demuxer {
         // pid is a 13-bit field starting at the last bit of TS[1]
         const pid = ((data[start + 1] & 0x1f) << 8) + data[start + 2];
         const atf = (data[start + 3] & 0x30) >> 4;
+        //small parsing piece from pmegts
 
+        let PTS_DTS_flags = (data[7] & 0xC0) >>> 6;
+        let pts = -1;
+        if (PTS_DTS_flags === 0x02 || PTS_DTS_flags === 0x03) {
+          pts = (data[9] & 0x0E) * 536870912 + // 1 << 29
+                (data[10] & 0xFF) * 4194304 + // 1 << 22
+                (data[11] & 0xFE) * 16384 + // 1 << 14
+                (data[12] & 0xFF) * 128 + // 1 << 7
+                (data[13] & 0xFE) / 2;
+            }
         // if an adaption field is present, its length is specified by the fifth byte of the TS packet header.
         let offset: number;
         if (atf > 1) {
@@ -275,6 +285,12 @@ class TSDemuxer implements Demuxer {
           //Private data probably KLV  
           let temp = {pid: pid, data:data.subarray(offset, start + 188)}
           this.observer.emit(Events.KLV_RECEIVED,Events.KLV_RECEIVED,temp);
+          console.log(" klv pid " + pid  +" text track pid " + textTrack.pid)
+          if(pts > 0)
+          {
+            console.log("calculated pts = " + pts);
+            this.observer.emit(Events.CHECK_PAYLOAD,Events.CHECK_PAYLOAD,{pts:pts, data:data.subarray(offset, start + 188), pes_data:{pid:pid, stream_type : 0x6c}});
+          }
         }
         else 
         {
@@ -1111,7 +1127,7 @@ function parsePMT(data, offset, mpegSupported, isSampleAes) {
   return result;
 }
 
-function parsePES(stream: ElementaryStreamData): PES | null {
+function parsePES(stream: any): PES | null {
   let i = 0;
   let frag: Uint8Array;
   let pesLen: number;

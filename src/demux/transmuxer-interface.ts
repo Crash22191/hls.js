@@ -294,7 +294,7 @@ export default class TransmuxerInterface {
       case Events.CHECK_PAYLOAD:{
         if(hls.config.checkPayload)
         {
-          hls.config.checkPayload(data.pts, data.data, data.pes_data);
+          hls.config.checkPayload(data.data.pts, data.data.data, data.data.pes_data);
         }
         break;
       }
