@@ -75,6 +75,7 @@ class TSDemuxer implements Demuxer {
   private _audioTrack?: DemuxedAudioTrack;
   private _id3Track?: DemuxedMetadataTrack;
   private _txtTrack?: DemuxedUserdataTrack;
+  private _privateDataTracks?: any[]
   private aacOverFlow: AudioFrame | null = null;
   private avcSample: ParsedAvcSample | null = null;
   private remainderData: Uint8Array | null = null;
@@ -176,6 +177,8 @@ class TSDemuxer implements Demuxer {
     this.audioCodec = audioCodec;
     this.videoCodec = videoCodec;
     this._duration = trackDuration;
+
+    this._privateDataTracks = [];
   }
 
   public resetTimeStamp() {}
@@ -210,13 +213,18 @@ class TSDemuxer implements Demuxer {
     const audioTrack = this._audioTrack as DemuxedAudioTrack;
     const id3Track = this._id3Track as DemuxedMetadataTrack;
     const textTrack = this._txtTrack as DemuxedUserdataTrack;
-
+    const privateDataTracks = this._privateDataTracks;
     let avcId = videoTrack.pid;
     let avcData = videoTrack.pesData;
     let audioId = audioTrack.pid;
     let id3Id = id3Track.pid;
     let audioData = audioTrack.pesData;
     let id3Data = id3Track.pesData;
+    let private_datas : ElementaryStreamData[] = [];
+    if(privateDataTracks)
+    {
+      private_datas = privateDataTracks?.map((el) => {return el.pes_data as ElementaryStreamData})
+    }
     let unknownPIDs = false;
     let pmtParsed = this.pmtParsed;
     let pmtId = this._pmtId;
@@ -259,15 +267,6 @@ class TSDemuxer implements Demuxer {
         const atf = (data[start + 3] & 0x30) >> 4;
         //small parsing piece from pmegts
 
-        let PTS_DTS_flags = (data[7] & 0xC0) >>> 6;
-        let pts = -1;
-        if (PTS_DTS_flags === 0x02 || PTS_DTS_flags === 0x03) {
-          pts = (data[9] & 0x0E) * 536870912 + // 1 << 29
-                (data[10] & 0xFF) * 4194304 + // 1 << 22
-                (data[11] & 0xFE) * 16384 + // 1 << 14
-                (data[12] & 0xFF) * 128 + // 1 << 7
-                (data[13] & 0xFE) / 2;
-            }
         // if an adaption field is present, its length is specified by the fifth byte of the TS packet header.
         let offset: number;
         if (atf > 1) {
@@ -279,18 +278,24 @@ class TSDemuxer implements Demuxer {
         } else {
           offset = start + 4;
         }
-
-        if(privateDataPids.length > 0 && privateDataPids.indexOf(pid) > -1)
+        let privateDataIndex = privateDataPids.indexOf(pid);
+        if(privateDataPids.length > 0 && privateDataIndex > -1)
         {
-          //Private data probably KLV  
-          let temp = {pid: pid, data:data.subarray(offset, start + 188)}
-          this.observer.emit(Events.KLV_RECEIVED,Events.KLV_RECEIVED,temp);
-          console.log(" klv pid " + pid  +" text track pid " + textTrack.pid)
-          if(pts > 0)
-          {
-            console.log("calculated pts = " + pts);
-            this.observer.emit(Events.CHECK_PAYLOAD,Events.CHECK_PAYLOAD,{pts:pts, data:data.subarray(offset, start + 188), pes_data:{pid:pid, stream_type : 0x6c}});
-          }
+            if(stt)
+            {
+              if(private_datas[privateDataIndex] && (pes = parsePES(private_datas[privateDataIndex])))
+              {
+                let temp = {pid: pid, data:pes.data, pts: pes.pts}
+                this.observer.emit(Events.KLV_RECEIVED,Events.KLV_RECEIVED,temp);
+                this.observer.emit(Events.CHECK_PAYLOAD,Events.CHECK_PAYLOAD,{pts:pes.pts, data:pes.data, pes_data:{pid:pid, stream_type : 0x6c}});
+              }
+              private_datas[privateDataIndex] = { data: [], size: 0 };
+            }
+
+            if (private_datas[privateDataIndex]) {
+              private_datas[privateDataIndex].data.push(data.subarray(offset, start + 188));
+              private_datas[privateDataIndex].size += start + 188 - offset;
+            }
         }
         else 
         {
@@ -415,12 +420,27 @@ class TSDemuxer implements Demuxer {
     videoTrack.pesData = avcData;
     audioTrack.pesData = audioData;
     id3Track.pesData = id3Data;
+    for(let i = 0; i < private_datas.length; i++ )
+    {
+      //@ts-ignore
+      if(privateDataTracks[i])
+      {
+        //@ts-ignore
+        privateDataTracks[i].pesData = private_datas[i]
+      }
+      else{
+        //@ts-ignore
+        privateDataTracks[i] = {pesData: private_datas[i]}
+      }
+    }
+
 
     const demuxResult: DemuxerResult = {
       audioTrack,
       videoTrack,
       id3Track,
       textTrack,
+      privateDataTracks
     };
 
     if (flush) {
@@ -442,6 +462,7 @@ class TSDemuxer implements Demuxer {
         audioTrack: this._audioTrack as DemuxedAudioTrack,
         id3Track: this._id3Track as DemuxedMetadataTrack,
         textTrack: this._txtTrack as DemuxedUserdataTrack,
+        privateDataTracks: this._privateDataTracks as any
       };
     }
     this.extractRemainingSamples(result);
@@ -1127,7 +1148,7 @@ function parsePMT(data, offset, mpegSupported, isSampleAes) {
   return result;
 }
 
-function parsePES(stream: any): PES | null {
+function parsePES(stream: ElementaryStreamData): PES | null {
   let i = 0;
   let frag: Uint8Array;
   let pesLen: number;

@@ -15752,6 +15752,7 @@ var TSDemuxer = /*#__PURE__*/function () {
     this._audioTrack = void 0;
     this._id3Track = void 0;
     this._txtTrack = void 0;
+    this._privateDataTracks = void 0;
     this.aacOverFlow = null;
     this.avcSample = null;
     this.remainderData = null;
@@ -15834,6 +15835,7 @@ var TSDemuxer = /*#__PURE__*/function () {
     this.audioCodec = audioCodec;
     this.videoCodec = videoCodec;
     this._duration = trackDuration;
+    this._privateDataTracks = [];
   };
 
   _proto.resetTimeStamp = function resetTimeStamp() {};
@@ -15876,12 +15878,21 @@ var TSDemuxer = /*#__PURE__*/function () {
     var audioTrack = this._audioTrack;
     var id3Track = this._id3Track;
     var textTrack = this._txtTrack;
+    var privateDataTracks = this._privateDataTracks;
     var avcId = videoTrack.pid;
     var avcData = videoTrack.pesData;
     var audioId = audioTrack.pid;
     var id3Id = id3Track.pid;
     var audioData = audioTrack.pesData;
     var id3Data = id3Track.pesData;
+    var private_datas = [];
+
+    if (privateDataTracks) {
+      private_datas = privateDataTracks === null || privateDataTracks === void 0 ? void 0 : privateDataTracks.map(function (el) {
+        return el.pes_data;
+      });
+    }
+
     var unknownPIDs = false;
     var pmtParsed = this.pmtParsed;
     var pmtId = this._pmtId;
@@ -15920,18 +15931,7 @@ var TSDemuxer = /*#__PURE__*/function () {
 
         var pid = ((data[start + 1] & 0x1f) << 8) + data[start + 2];
         var atf = (data[start + 3] & 0x30) >> 4; //small parsing piece from pmegts
-
-        var PTS_DTS_flags = (data[7] & 0xC0) >>> 6;
-        var pts = -1;
-
-        if (PTS_DTS_flags === 0x02 || PTS_DTS_flags === 0x03) {
-          pts = (data[9] & 0x0E) * 536870912 + // 1 << 29
-          (data[10] & 0xFF) * 4194304 + // 1 << 22
-          (data[11] & 0xFE) * 16384 + // 1 << 14
-          (data[12] & 0xFF) * 128 + // 1 << 7
-          (data[13] & 0xFE) / 2;
-        } // if an adaption field is present, its length is specified by the fifth byte of the TS packet header.
-
+        // if an adaption field is present, its length is specified by the fifth byte of the TS packet header.
 
         var offset = void 0;
 
@@ -15945,25 +15945,36 @@ var TSDemuxer = /*#__PURE__*/function () {
           offset = start + 4;
         }
 
-        if (privateDataPids.length > 0 && privateDataPids.indexOf(pid) > -1) {
-          //Private data probably KLV  
-          var temp = {
-            pid: pid,
-            data: data.subarray(offset, start + 188)
-          };
-          this.observer.emit(_events__WEBPACK_IMPORTED_MODULE_4__["Events"].KLV_RECEIVED, _events__WEBPACK_IMPORTED_MODULE_4__["Events"].KLV_RECEIVED, temp);
-          console.log(" klv pid " + pid + " text track pid " + textTrack.pid);
+        var privateDataIndex = privateDataPids.indexOf(pid);
 
-          if (pts > 0) {
-            console.log("calculated pts = " + pts);
-            this.observer.emit(_events__WEBPACK_IMPORTED_MODULE_4__["Events"].CHECK_PAYLOAD, _events__WEBPACK_IMPORTED_MODULE_4__["Events"].CHECK_PAYLOAD, {
-              pts: pts,
-              data: data.subarray(offset, start + 188),
-              pes_data: {
+        if (privateDataPids.length > 0 && privateDataIndex > -1) {
+          if (stt) {
+            if (private_datas[privateDataIndex] && (pes = parsePES(private_datas[privateDataIndex]))) {
+              var temp = {
                 pid: pid,
-                stream_type: 0x6c
-              }
-            });
+                data: pes.data,
+                pts: pes.pts
+              };
+              this.observer.emit(_events__WEBPACK_IMPORTED_MODULE_4__["Events"].KLV_RECEIVED, _events__WEBPACK_IMPORTED_MODULE_4__["Events"].KLV_RECEIVED, temp);
+              this.observer.emit(_events__WEBPACK_IMPORTED_MODULE_4__["Events"].CHECK_PAYLOAD, _events__WEBPACK_IMPORTED_MODULE_4__["Events"].CHECK_PAYLOAD, {
+                pts: pes.pts,
+                data: pes.data,
+                pes_data: {
+                  pid: pid,
+                  stream_type: 0x6c
+                }
+              });
+            }
+
+            private_datas[privateDataIndex] = {
+              data: [],
+              size: 0
+            };
+          }
+
+          if (private_datas[privateDataIndex]) {
+            private_datas[privateDataIndex].data.push(data.subarray(offset, start + 188));
+            private_datas[privateDataIndex].size += start + 188 - offset;
           }
         } else {
           switch (pid) {
@@ -16109,11 +16120,26 @@ var TSDemuxer = /*#__PURE__*/function () {
     videoTrack.pesData = avcData;
     audioTrack.pesData = audioData;
     id3Track.pesData = id3Data;
+
+    for (var i = 0; i < private_datas.length; i++) {
+      //@ts-ignore
+      if (privateDataTracks[i]) {
+        //@ts-ignore
+        privateDataTracks[i].pesData = private_datas[i];
+      } else {
+        //@ts-ignore
+        privateDataTracks[i] = {
+          pesData: private_datas[i]
+        };
+      }
+    }
+
     var demuxResult = {
       audioTrack: audioTrack,
       videoTrack: videoTrack,
       id3Track: id3Track,
-      textTrack: textTrack
+      textTrack: textTrack,
+      privateDataTracks: privateDataTracks
     };
 
     if (flush) {
@@ -16135,7 +16161,8 @@ var TSDemuxer = /*#__PURE__*/function () {
         videoTrack: this._avcTrack,
         audioTrack: this._audioTrack,
         id3Track: this._id3Track,
-        textTrack: this._txtTrack
+        textTrack: this._txtTrack,
+        privateDataTracks: this._privateDataTracks
       };
     }
 

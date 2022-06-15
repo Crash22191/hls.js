@@ -27,6 +27,7 @@ export interface DemuxerResult {
   videoTrack: DemuxedVideoTrack;
   id3Track: DemuxedMetadataTrack;
   textTrack: DemuxedUserdataTrack;
+  privateDataTracks?: any;
 }
 
 export interface DemuxedTrack {
