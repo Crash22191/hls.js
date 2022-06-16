@@ -296,6 +296,7 @@ class TSDemuxer implements Demuxer {
               private_datas[privateDataIndex].data.push(data.subarray(offset, start + 188));
               private_datas[privateDataIndex].size += start + 188 - offset;
             }
+            
         }
         else 
         {
