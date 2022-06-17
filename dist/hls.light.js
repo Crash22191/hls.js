@@ -12062,18 +12062,18 @@ var TSDemuxer = /*#__PURE__*/function () {
                   pid: pid,
                   stream_type: 0x6c
                 }
-              });
+              }); // console.log("PTS PRIVATE SENT ")
             }
 
             private_datas[privateDataIndex] = {
               data: [],
               size: 0
-            };
+            }; // console.log("PTS PRIVATE EXPAND ")
           }
 
           if (private_datas[privateDataIndex]) {
             private_datas[privateDataIndex].data.push(data.subarray(offset, start + 188));
-            private_datas[privateDataIndex].size += start + 188 - offset;
+            private_datas[privateDataIndex].size += start + 188 - offset; // console.log("PTS PRIVATE EXPAND ")
           }
         } else {
           switch (pid) {
@@ -12081,7 +12081,7 @@ var TSDemuxer = /*#__PURE__*/function () {
             case avcId:
               if (stt) {
                 if (avcData && (pes = parsePES(avcData))) {
-                  this.parseAVCPES(videoTrack, textTrack, pes, false, data.subarray(offset, start + 188));
+                  this.parseAVCPES(videoTrack, textTrack, pes, false);
                 }
 
                 avcData = {
@@ -12180,7 +12180,7 @@ var TSDemuxer = /*#__PURE__*/function () {
                   id3Track.pid = id3Id;
                 }
 
-                privateDataPids = parsedPIDs.private_data;
+                privateDataPids = parsedPIDs.private_data; // console.log("PTS Private DATA PID " + JSON.stringify(privateDataPids))
 
                 if (unknownPIDs && !pmtParsed) {
                   _utils_logger__WEBPACK_IMPORTED_MODULE_6__["logger"].log('reparse from beginning');
@@ -12286,7 +12286,7 @@ var TSDemuxer = /*#__PURE__*/function () {
     var pes;
 
     if (avcData && (pes = parsePES(avcData))) {
-      this.parseAVCPES(videoTrack, textTrack, pes, true, null);
+      this.parseAVCPES(videoTrack, textTrack, pes, true);
       videoTrack.pesData = null;
     } else {
       // either avcData null or PES truncated, keep it for next frag parsing
@@ -12352,14 +12352,111 @@ var TSDemuxer = /*#__PURE__*/function () {
     this._duration = 0;
   };
 
-  _proto.parseAVCPES = function parseAVCPES(track, textTrack, pes, last, data) {
+  _proto.parsePESMpegTS = function parsePESMpegTS(pes_data) {
+    var data = pes_data.data;
+    var packet_start_code_prefix = data[0] << 16 | data[1] << 8 | data[2];
+    var stream_id = data[3];
+    var PES_packet_length = data[4] << 8 | data[5]; // Log.v(this.TAG,pes_data.stream_type);
+
+    if (packet_start_code_prefix !== 1) {
+      //Log.e(this.TAG, `parsePES: packet_start_code_prefix should be 1 but with value ${packet_start_code_prefix}`);
+      return;
+    } // if(pes_data.stream_type === StreamType.KLVAsync|| pes_data.stream_type ===  StreamType.KLVsync )
+    // {
+    //     Log.v(this.TAG,"I AM KLV PACKET ")
+    //    alert();
+    // }
+
+
+    if (stream_id !== 0xBC // program_stream_map
+    && stream_id !== 0xBE // padding_stream
+    && stream_id !== 0xBF // private_stream_2
+    && stream_id !== 0xF0 // ECM
+    && stream_id !== 0xF1 // EMM
+    && stream_id !== 0xFF // program_stream_directory
+    && stream_id !== 0xF2 // DSMCC
+    && stream_id !== 0xF8) {
+      var PES_scrambling_control = (data[6] & 0x30) >>> 4;
+      var PTS_DTS_flags = (data[7] & 0xC0) >>> 6;
+      var PES_header_data_length = data[8];
+      var pts;
+      var dts;
+
+      if (PTS_DTS_flags === 0x02 || PTS_DTS_flags === 0x03) {
+        pts = (data[9] & 0x0E) * 536870912 + // 1 << 29
+        (data[10] & 0xFF) * 4194304 + // 1 << 22
+        (data[11] & 0xFE) * 16384 + // 1 << 14
+        (data[12] & 0xFF) * 128 + // 1 << 7
+        (data[13] & 0xFE) / 2;
+
+        if (PTS_DTS_flags === 0x03) {
+          dts = (data[14] & 0x0E) * 536870912 + // 1 << 29
+          (data[15] & 0xFF) * 4194304 + // 1 << 22
+          (data[16] & 0xFE) * 16384 + // 1 << 14
+          (data[17] & 0xFF) * 128 + // 1 << 7
+          (data[18] & 0xFE) / 2;
+        } else {
+          dts = pts;
+        }
+      }
+
+      var payload_start_index = 6 + 3 + PES_header_data_length;
+      var payload_length;
+
+      if (PES_packet_length !== 0) {
+        if (PES_packet_length < 3 + PES_header_data_length) {
+          // Log.v(this.TAG, `Malformed PES: PES_packet_length < 3 + PES_header_data_length`);
+          return;
+        }
+
+        payload_length = PES_packet_length - 3 - PES_header_data_length;
+      } else {
+        // PES_packet_length === 0
+        payload_length = data.byteLength - payload_start_index;
+      }
+
+      var payload = data.subarray(payload_start_index, payload_start_index + payload_length);
+    }
+  };
+
+  _proto.stripExtra0001 = function stripExtra0001(data) {
+    var match = true;
+    var target = new Uint8Array([0, 0, 0, 1, 0, 0, 0, 1]);
+
+    for (var i = 0; i < target.length; i++) {
+      if (data[i] !== target[i]) {
+        match = false;
+      }
+    }
+
+    return match ? data.slice(4) : data;
+  };
+
+  _proto.checkPackageValidity = function checkPackageValidity(data) {
+    var ptsdtsIndex = -1;
+
+    for (var i = 0; i < 20; i++) {
+      var k = (data[i] & 0xC0) >>> 6;
+
+      if (k === 0x02 || k === 0x03) {
+        ptsdtsIndex = i;
+        break;
+      }
+    }
+
+    return ptsdtsIndex === -1 ? true : false;
+  };
+
+  _proto.parseAVCPES = function parseAVCPES(track, textTrack, pes, last) {
     var _this = this;
 
     var units = this.parseAVCNALu(track, pes.data);
     var debug = false;
     var avcSample = this.avcSample;
     var push;
-    var spsfound = false; // free pes.data to save up some memory
+    var spsfound = false;
+    var data = this.stripExtra0001(pes.data);
+    var invalid = this.checkPackageValidity(data); // free pes.data to save up some memory
 
     pes.data = null; // if new NAL units found and last sample still there, let's push ...
     // this helps parsing streams with missing AUD (only do this if AUD never found)
@@ -12516,7 +12613,7 @@ var TSDemuxer = /*#__PURE__*/function () {
       }
     });
 
-    if (data !== null && avcSample && avcSample.key) {
+    if (!invalid && avcSample && avcSample.key) {
       var tempPES = pes;
       tempPES.pid = track.pid;
       tempPES.stream_type = 0x1b;
@@ -12525,8 +12622,7 @@ var TSDemuxer = /*#__PURE__*/function () {
         data: data,
         pes_data: tempPES
       });
-    } // if last
-    // if last PES packet, push samples
+    } // if last PES packet, push samples
 
 
     if (last && avcSample) {
